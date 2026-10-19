@@ -1,0 +1,32 @@
+name: "ARSENAL A23 - Aprovacao local (sem deploy)"
+run-name: "ARSENAL A23 LOCAL | ${{ inputs.candidate_sha }} | ${{ inputs.dependency_digest }}"
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: "SHA do candidato local, 40 caracteres hexadecimais"
+        required: true
+        type: string
+      dependency_digest:
+        description: "SHA-256 das 22 evidencias e tres gates tecnicos"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  a23-human-approval:
+    name: a23-human-approval
+    environment:
+      name: arsenal-a23-local-approval
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar apenas a identidade da release
+        env:
+          TARGET_SHA: ${{ inputs.candidate_sha }}
+          DEPENDENCY_DIGEST: ${{ inputs.dependency_digest }}
+        run: |
+          [[ "$TARGET_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 2
+          [[ "$DEPENDENCY_DIGEST" =~ ^[a-f0-9]{64}$ ]] || exit 2
+          printf '%s\n' "Aprovacao apenas da release local ARSENAL A23."
+          printf '%s\n' "Nao existe checkout, build, publicacao, alteracao de dados ou deploy."
