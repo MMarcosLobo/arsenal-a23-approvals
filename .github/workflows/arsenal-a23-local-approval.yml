@@ -1,5 +1,6 @@
 name: "ARSENAL A23 - Aprovacao local (sem deploy)"
 run-name: "ARSENAL A23 LOCAL | ${{ inputs.candidate_sha }} | ${{ inputs.dependency_digest }}"
+
 on:
   workflow_dispatch:
     inputs:
@@ -11,22 +12,59 @@ on:
         description: "SHA-256 das 22 evidencias e tres gates tecnicos"
         required: true
         type: string
+      phase:
+        description: "request=gera aprovacao via bot; approval=espera autorizacao humana"
+        required: false
+        type: choice
+        options:
+          - request
+          - approval
+        default: request
+
 permissions:
   contents: read
+
 jobs:
+  a23-request-approval:
+    name: a23-request-approval
+    if: inputs.phase == 'request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Validar o SHA e solicitar etapa protegida com GITHUB_TOKEN efemero
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ inputs.candidate_sha }}
+          DEPENDENCY_DIGEST: ${{ inputs.dependency_digest }}
+        run: |
+          [[ "$TARGET_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 2
+          [[ "$DEPENDENCY_DIGEST" =~ ^[a-f0-9]{64}$ ]] || exit 2
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/arsenal-a23-local-approval.yml/dispatches" \
+            -f ref=main \
+            -f "inputs[candidate_sha]=$TARGET_SHA" \
+            -f "inputs[dependency_digest]=$DEPENDENCY_DIGEST" \
+            -f 'inputs[phase]=approval'
+          echo "Etapa protegida solicitada; nenhum deploy foi executado."
+
   a23-human-approval:
     name: a23-human-approval
+    if: inputs.phase == 'approval'
     environment:
       name: arsenal-a23-local-approval
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
-      - name: Verificar apenas a identidade da release
+      - name: Validar exclusivamente a identidade da release local
         env:
           TARGET_SHA: ${{ inputs.candidate_sha }}
           DEPENDENCY_DIGEST: ${{ inputs.dependency_digest }}
         run: |
           [[ "$TARGET_SHA" =~ ^[a-f0-9]{40}$ ]] || exit 2
           [[ "$DEPENDENCY_DIGEST" =~ ^[a-f0-9]{64}$ ]] || exit 2
-          printf '%s\n' "Aprovacao apenas da release local ARSENAL A23."
-          printf '%s\n' "Nao existe checkout, build, publicacao, alteracao de dados ou deploy."
+          printf '%s\n' "Aprovacao humana: somente ARSENAL A23 local."
+          printf '%s\n' "Sem checkout, build, upload, publicacao, alteracao de dados nem deploy."

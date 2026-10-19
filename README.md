@@ -1,25 +1,25 @@
-# ARSENAL A23 — GitHub approval-only (proposta local)
+# ARSENAL A23 — aprovacao humana protegida (somente metadados)
 
-**Nao publicado e nao ativado.** Este pacote sera publicado somente se o usuario autorizar explicitamente um repositorio PUBLICO de metadados separado de seu codigo.
+Este repositório **público** contém exclusivamente este README e um workflow de aprovação. **NÃO inclui** o código-fonte ou dados do ARSENAL, Cotton Flow, Central de Demandas, tokens ou credenciais.
 
-Repositorio pretendido: `MMarcosLobo/arsenal-a23-approvals`. O codigo do ARSENAL, `arsenal-a23-benchmark`, Cotton Flow e Central de Demandas permanecem privados e inalterados.
+## Fluxo em duas etapas
 
-## Ambiente protegido obrigatorio no GitHub
-1. `arsenal-a23-local-approval` com Required reviewers incluindo `MMarcosLobo`.
-2. `Prevent self-review` ativado, `Prevent admins bypass` ativado.
-3. Workflow pinado a um SHA especifico, independente do SHA do projeto ARSENAL.
-4. Workflow disparado por um BOT/GitHub App que NAO seja o revisor humano.
-5. Usuario revisa o titulo com SHA `ac5bc2c41521ab7b5a0adaf1b6d8067c3bb39ea6` e digest das 22 dependencias, e aprova no GitHub.
-6. O workflow possui um job de verificacao simples, sem deploy ou publicacao.
+1. Um operador solicita `workflow_dispatch` com o SHA do candidato local e o digest de suas 22 evidências.
+2. Job `a23-request-approval`, sem segredos privados, usa o token **efêmero** do próprio GitHub Actions (`GITHUB_TOKEN`, `actions:write`) para solicitar um **novo** `workflow_dispatch` com `phase=approval`.
+3. O novo job `a23-human-approval` fica **bloqueado** pelo environment `arsenal-a23-local-approval`. O revisor designado verifica SHA/digest e escolhe *Approve* ou *Reject* no GitHub.
+4. O job aprovado valida somente o SHA/digest e termina. Não executa checkout, build, deploy, push, download de código privado ou qualquer alteração de dados.
+5. O verificador local consulta a API **pública e anônima** do GitHub para comprovar a aprovação do job certo, do workflow imutável e do SHA/digest exatos.
 
-## Verificacao independente
-O script `CONTROL-PLANE/scripts/a23-github-approval-check.mjs` consulta a API PUBLICA do GitHub em modo ANONIMO (sem token) e valida: identidade do repo, SHA do workflow pinado, ambiente protegido, reviewer humano, self-review negada, bypass administrativo negado, acionador distinto, run aprovada e recente com SHA/digest exatos, job correto.
+## Ambiente protegido (configurado pelo proprietário)
 
-A policy `.ai/A23-GITHUB-APPROVAL-POLICY.json` permanece `enabled:false` ate que a infraestrutura externa exista. O A23 permanece bloqueado.
+- Required reviewer: `MMarcosLobo`.
+- Prevent self-review: `true`.
+- Allow administrators bypass: `false`.
+- Job alvo: `a23-human-approval` (somente na segunda execução).
+- O workflow deve permanecer fixado a commit e hash de blob explícitos no verificador.
 
-## Bloqueio importante
-O cliente `gh` atual no Windows esta autenticado como `MMarcosLobo`, conta humana que seria a revisora. Se essa credencial tiver capacidade de aprovar o run, qualquer agente local com acesso ao token pode tentar aprovar sozinho via API. A separacao de credenciais/autoridades e requisito antes de ativar o gate, nao apenas opcao.
+## Limitações de segurança
 
-Em repositórios privados, GitHub Free/Pro/Team nao oferece required reviewers. O repositorio minimo publico seria APENAS de aprovacao e NAO incluiria codigo-fonte, secrets, artefatos ou manifestos completos. A alternativa de manter o fluxo privado e contratar plano GitHub Enterprise e definir protecoes equivalentes.
+O operador humano não pode ter suas credenciais de aprovação acessíveis ao processo automatizado que avalia o gate. Uma conta GitHub pessoal autenticada na CLI do Windows pode ter autorização para aprovar pela API; nesse caso, a evidência externa não prova necessariamente um *clique humano*. Separar a credencial de aprovação da automação e auditar alterações de configuração do repositório são controles obrigatórios antes de declarar release resistente a agentes locais maliciosos.
 
-Nenhum commit, push, workflow_dispatch ou deploy foi feito nesta preparacao.
+Este repositório serve somente para a autorização **LOCAL** do ARSENAL A23. Nenhuma aprovação deste workflow concede permissão de deploy, merge, push em produção ou modificação do Cotton.
